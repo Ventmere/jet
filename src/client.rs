@@ -1,11 +1,11 @@
-use std::sync::Mutex;
+use chrono::{DateTime, Duration, Utc};
+use error::*;
+use reqwest;
+pub use reqwest::{Method, RequestBuilder, Response, StatusCode};
+use serde::de::DeserializeOwned;
 use std::cell::RefCell;
 use std::io::Read;
-use reqwest;
-use chrono::{DateTime, Utc, Duration};
-use serde::de::DeserializeOwned;
-pub use reqwest::{Method, RequestBuilder, Response, StatusCode};
-use error::*;
+use std::sync::Mutex;
 
 const ENDPOINT: &'static str = "https://merchant-api.jet.com/api";
 
@@ -33,7 +33,7 @@ impl Client {
     Ok(Client {
       options: opts,
       token: Mutex::new(RefCell::new(None)),
-      client: reqwest::Client::new()?,
+      client: reqwest::Client::new(),
     })
   }
 
@@ -45,15 +45,14 @@ impl Client {
     }
   }
 
-  pub(crate) fn with_token<T, F>(&self, f: F) -> Result<T> 
-    where F: FnOnce(&Token) -> Result<T>
+  pub(crate) fn with_token<T, F>(&self, f: F) -> Result<T>
+  where
+    F: FnOnce(&Token) -> Result<T>,
   {
     let guard = self.token.lock().expect("lock token");
     let token: &mut Option<Token> = &mut guard.borrow_mut();
     match *token {
-      Some(ref token) if token.expires_on - Duration::minutes(15) >= Utc::now() => {
-        f(&token)
-      },
+      Some(ref token) if token.expires_on - Duration::minutes(15) >= Utc::now() => f(&token),
       _ => {
         use std::mem::replace;
         replace(token, Some(self.get_token()?));
@@ -69,11 +68,13 @@ impl Client {
       pub pass: &'a str,
     }
 
-    let mut res = self.client.post(&format!("{}/token", ENDPOINT))?
+    let mut res = self
+      .client
+      .post(&format!("{}/token", ENDPOINT))
       .json(&TokenRequest {
         user: &self.options.api_user,
         pass: &self.options.secret,
-      })?
+      })
       .send()?;
 
     if !res.status().is_success() {
@@ -85,18 +86,20 @@ impl Client {
     res.json().chain_err(|| ErrorKind::InvalidResponse)
   }
 
-  pub(crate) fn request<T, F>(&self, method: Method, path: &str, f: F) -> Result<T> 
-    where T: DeserializeOwned, F: FnOnce(&mut RequestBuilder) -> Result<()>
+  pub(crate) fn request<T, F>(&self, method: Method, path: &str, f: F) -> Result<T>
+  where
+    T: DeserializeOwned,
+    F: FnOnce(&mut RequestBuilder) -> Result<()>,
   {
     use reqwest::header::{Authorization, Bearer};
 
     let mut req = self.with_token(|token| -> Result<RequestBuilder> {
-      let mut req = self.client.request(method, &format!("{}{}", ENDPOINT, path))?;
-      req.header(Authorization(
-        Bearer {
-          token: token.id_token.clone(),
-        }
-      ));
+      let mut req = self
+        .client
+        .request(method, &format!("{}{}", ENDPOINT, path));
+      req.header(Authorization(Bearer {
+        token: token.id_token.clone(),
+      }));
       Ok(req)
     })?;
 
@@ -113,18 +116,19 @@ impl Client {
     res.json().chain_err(|| ErrorKind::InvalidResponse)
   }
 
-  pub(crate) fn request_no_content<F>(&self, method: Method, path: &str, f: F) -> Result<()> 
-    where F: FnOnce(&mut RequestBuilder) -> Result<()>
+  pub(crate) fn request_no_content<F>(&self, method: Method, path: &str, f: F) -> Result<()>
+  where
+    F: FnOnce(&mut RequestBuilder) -> Result<()>,
   {
     use reqwest::header::{Authorization, Bearer};
 
     let mut req = self.with_token(|token| -> Result<RequestBuilder> {
-      let mut req = self.client.request(method, &format!("{}{}", ENDPOINT, path))?;
-      req.header(Authorization(
-        Bearer {
-          token: token.id_token.clone(),
-        }
-      ));
+      let mut req = self
+        .client
+        .request(method, &format!("{}{}", ENDPOINT, path));
+      req.header(Authorization(Bearer {
+        token: token.id_token.clone(),
+      }));
       Ok(req)
     })?;
 
@@ -163,14 +167,18 @@ mod tests {
   fn test_with_token() {
     let client = get_test_client();
     let mut last_token: Option<String> = None;
-    client.with_token(|token| -> Result<()> {
-      last_token = Some(token.id_token.clone());
-      Ok(())
-    }).unwrap();
+    client
+      .with_token(|token| -> Result<()> {
+        last_token = Some(token.id_token.clone());
+        Ok(())
+      })
+      .unwrap();
 
-    client.with_token(|token| -> Result<()> {
-      assert_eq!(&token.id_token, last_token.as_ref().unwrap());
-      Ok(())
-    }).unwrap();
+    client
+      .with_token(|token| -> Result<()> {
+        assert_eq!(&token.id_token, last_token.as_ref().unwrap());
+        Ok(())
+      })
+      .unwrap();
   }
 }

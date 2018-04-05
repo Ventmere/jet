@@ -2,31 +2,31 @@
 //! [Jet Documentation](https://developer.jet.com/docs/order-status)
 //!
 
-use error::*;
-use utils::serialize_datetime;
 use super::client::{Client, Method};
 use chrono::{DateTime, Utc};
+use error::*;
+use utils::serialize_datetime;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum OrderStatus {
   /// 'created' - The order has just been placed. Jet.com allows a half hour for fraud check and customer cancellation. We ask that retailers NOT fulfill orders that are created.
-  #[serde(rename="created")]
+  #[serde(rename = "created")]
   Created,
 
   /// 'ready' - The order is ready to be fulfilled by the retailer
-  #[serde(rename="ready")]  
+  #[serde(rename = "ready")]
   Ready,
 
   /// 'acknowledged' - The order has been accepted by the retailer and is awaiting fulfillment
-  #[serde(rename="acknowledged")]  
+  #[serde(rename = "acknowledged")]
   Acknowledged,
-  
+
   /// 'inprogress' - The order is partially shipped
-  #[serde(rename="inprogress")]
+  #[serde(rename = "inprogress")]
   Inprogress,
 
   /// 'complete' - The order is completely shipped or cancelled. All units have been accounted for
-  #[serde(rename="complete")]  
+  #[serde(rename = "complete")]
   Complete,
 }
 
@@ -169,21 +169,18 @@ pub struct Order {
   pub order_items: Vec<OrderItem>,
 
   // When an order moves from "created" to "ready"
-
   pub order_ready_date: Option<DateTime<Utc>>,
   pub has_shipments: bool,
 
   // When an order moves from "ready" to "acknowledged", the following fields are added
-
   pub order_acknowledge_date: Option<DateTime<Utc>>,
   /// Status to let Jet know whether you accept or reject the order.
-  /// Errors that occur at the item level should be given the status 
+  /// Errors that occur at the item level should be given the status
   // 'rejected - item level error'. This is returned in the order acknowledgement message.
   pub acknowledgement_status: Option<String>,
 
   // The following fields are provided by the merchant through the shipped message.
   // If multiple shipped messages are sent, shipment objects will be aggregated into the same shipments array
-
   pub shipments: Option<Vec<Shipment>>,
 }
 
@@ -204,7 +201,7 @@ pub struct AcknowledgeOrderItem {
   pub order_item_id: String,
   /// Optional seller-supplied ID for an item in an order.
   /// If this value is specified with the Jet's order_item_id,
-  /// Jet will map the two IDs and you can then use your own 
+  /// Jet will map the two IDs and you can then use your own
   /// order item ID for subsequent feeds relating to that order item.
   pub alt_order_item_id: Option<String>,
 }
@@ -237,7 +234,7 @@ pub struct ShipOrderShipment {
   pub carrier: String,
   pub shipment_tracking_number: String,
   pub shipment_items: Vec<ShipOrderShipmentItem>,
-  #[serde(serialize_with="serialize_datetime")]
+  #[serde(serialize_with = "serialize_datetime")]
   pub response_shipment_date: DateTime<Utc>,
 }
 
@@ -249,34 +246,48 @@ pub struct ShipOrder {
 
 impl Client {
   pub fn get_orders(&self, status: OrderStatus) -> Result<GetOrdersResponse> {
-    self.request(Method::Get, &format!("/orders/{}", match status {
-      OrderStatus::Created => "created", 
-      OrderStatus::Ready => "ready",
-      OrderStatus::Acknowledged => "acknowledged",
-      OrderStatus::Inprogress => "inprogress",
-      OrderStatus::Complete => "complete",
-    }), |_| { Ok(()) })
+    self.request(
+      Method::Get,
+      &format!(
+        "/orders/{}",
+        match status {
+          OrderStatus::Created => "created",
+          OrderStatus::Ready => "ready",
+          OrderStatus::Acknowledged => "acknowledged",
+          OrderStatus::Inprogress => "inprogress",
+          OrderStatus::Complete => "complete",
+        }
+      ),
+      |_| Ok(()),
+    )
   }
 
   pub fn get_order_detail(&self, order_url: &str) -> Result<Order> {
-    self.request(Method::Get, order_url, |_| { Ok(()) })
+    self.request(Method::Get, order_url, |_| Ok(()))
   }
 
   pub fn acknowledge_order(&self, order_id: &str, ack: &AcknowledgeOrder) -> Result<()> {
-    self.request_no_content(Method::Put, &format!("/orders/{}/acknowledge", order_id), |req| {
-      req.json(ack)?;
-      Ok(()) 
-    })
+    self.request_no_content(
+      Method::Put,
+      &format!("/orders/{}/acknowledge", order_id),
+      |req| {
+        req.json(ack);
+        Ok(())
+      },
+    )
   }
 
   pub fn ship_order(&self, order_id: &str, ship: &ShipOrder) -> Result<()> {
-    self.request_no_content(Method::Put, &format!("/orders/{}/shipped", order_id), |req| {
-      req.json(ship)?;
-      Ok(()) 
-    })
+    self.request_no_content(
+      Method::Put,
+      &format!("/orders/{}/shipped", order_id),
+      |req| {
+        req.json(ship);
+        Ok(())
+      },
+    )
   }
 }
-
 
 #[test]
 fn test_get_orders() {
@@ -289,45 +300,63 @@ fn test_get_orders() {
 fn test_get_order_detail() {
   use client::get_test_client;
   let client = get_test_client();
-  println!("{:#?}", client.get_order_detail("/orders/withoutShipmentDetail/2ab4c8b414124f0fa04072d615ec0610").unwrap());
+  println!(
+    "{:#?}",
+    client
+      .get_order_detail("/orders/withoutShipmentDetail/2ab4c8b414124f0fa04072d615ec0610")
+      .unwrap()
+  );
 }
 
 #[test]
 fn test_acknowledge_order() {
   use client::get_test_client;
   let client = get_test_client();
-  println!("{:#?}", client.acknowledge_order("2ab4c8b414124f0fa04072d615ec0610", &AcknowledgeOrder {
-    acknowledgement_status: "accepted",
-    alt_order_id: None,
-    order_items: vec![
-      AcknowledgeOrderItem {
-        order_item_acknowledgement_status: "fulfillable",
-        order_item_id: "2906d22b212d4745ab9986b80b1ad2af".to_owned(),
-        alt_order_item_id: None,
-      }
-    ],
-  }).unwrap());
+  println!(
+    "{:#?}",
+    client
+      .acknowledge_order(
+        "2ab4c8b414124f0fa04072d615ec0610",
+        &AcknowledgeOrder {
+          acknowledgement_status: "accepted",
+          alt_order_id: None,
+          order_items: vec![
+            AcknowledgeOrderItem {
+              order_item_acknowledgement_status: "fulfillable",
+              order_item_id: "2906d22b212d4745ab9986b80b1ad2af".to_owned(),
+              alt_order_item_id: None,
+            },
+          ],
+        }
+      )
+      .unwrap()
+  );
 }
 
 #[test]
 fn test_ship_order() {
   use client::get_test_client;
   let client = get_test_client();
-  client.ship_order("2ab4c8b414124f0fa04072d615ec0610", &ShipOrder {
-    alt_order_id: None,
-    shipments: vec![
-      ShipOrderShipment {
-        carrier: "UPS".to_owned(),
-        shipment_tracking_number: "1Z12342452342".to_owned(),
-        shipment_items: vec![
-          ShipOrderShipmentItem {
-            merchant_sku: "test_product".to_owned(),
-            response_shipment_sku_quantity: 1,
-            days_to_return: 30,
-          }
+  client
+    .ship_order(
+      "2ab4c8b414124f0fa04072d615ec0610",
+      &ShipOrder {
+        alt_order_id: None,
+        shipments: vec![
+          ShipOrderShipment {
+            carrier: "UPS".to_owned(),
+            shipment_tracking_number: "1Z12342452342".to_owned(),
+            shipment_items: vec![
+              ShipOrderShipmentItem {
+                merchant_sku: "test_product".to_owned(),
+                response_shipment_sku_quantity: 1,
+                days_to_return: 30,
+              },
+            ],
+            response_shipment_date: Utc::now(),
+          },
         ],
-        response_shipment_date: Utc::now(),
-      }
-    ],
-  }).unwrap()
+      },
+    )
+    .unwrap()
 }

@@ -1,6 +1,6 @@
 [package]
 name = "jet"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Flux Xu <fluxxu@gmail.com>"]
 description = "Jet API Client for Rust"
 license = "MIT"
@@ -9,7 +9,7 @@ license = "MIT"
 chrono = { version = "0.4.0", features = ["serde"] }
 serde = "1.0.10"
 serde_derive = "1.0.10"
-reqwest = "0.7.1"
+reqwest = "0.8.5"
 error-chain = "0.11.0"
 
 [dev-dependencies]
