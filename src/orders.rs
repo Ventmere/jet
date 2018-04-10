@@ -33,7 +33,7 @@ pub enum OrderStatus {
 /// Shipping details about the order
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OrderDetail {
-  pub request_shipping_carrier: String,
+  pub request_shipping_carrier: Option<String>,
   pub request_shipping_method: String,
   pub request_service_level: String,
   pub request_ship_by: DateTime<Utc>,
@@ -51,7 +51,7 @@ pub struct Buyer {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Address {
   pub address1: String,
-  pub address2: String,
+  pub address2: Option<String>,
   pub city: String,
   pub state: String,
   pub zip_code: String,
@@ -96,7 +96,7 @@ pub struct OrderItem {
   pub product_title: String,
   pub request_order_quantity: i32,
   pub adjustment_reason: Option<String>,
-  pub item_tax_code: String,
+  pub item_tax_code: Option<String>,
   pub url: String,
   pub price_adjustment: Option<f32>,
   pub item_fees: Option<f32>,
@@ -110,26 +110,26 @@ pub struct OrderItem {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ShipmentItem {
-  pub shipment_item_id: String,
-  pub alt_shipment_item_id: String,
+  pub shipment_item_id: Option<String>,
+  pub alt_shipment_item_id: Option<String>,
   pub merchant_sku: String,
   pub response_shipment_sku_quantity: i32,
-  pub response_shipment_cancel_qty: i32,
+  pub response_shipment_cancel_qty: Option<i32>,
   #[serde(rename = "RMA_number")]
-  pub rma_number: String,
-  pub days_to_return: i32,
-  pub return_location: Address,
+  pub rma_number: Option<String>,
+  pub days_to_return: Option<i32>,
+  pub return_location: Option<Address>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Shipment {
   pub shipment_id: String,
-  pub alt_shipment_id: String,
-  pub shipment_tracking_number: String,
+  pub alt_shipment_id: Option<String>,
+  pub shipment_tracking_number: Option<String>,
   pub response_shipment_date: Option<DateTime<Utc>>,
-  pub response_shipment_method: String,
+  pub response_shipment_method: Option<String>,
   pub expected_delivery_date: Option<DateTime<Utc>>,
-  pub ship_from_zip_code: String,
+  pub ship_from_zip_code: Option<String>,
   pub carrier: String,
   pub carrier_pick_up_date: Option<DateTime<Utc>>,
   pub shipment_items: Vec<ShipmentItem>,
@@ -232,7 +232,7 @@ pub struct ShipOrderShipmentItem {
 #[derive(Debug, Serialize)]
 pub struct ShipOrderShipment {
   pub carrier: String,
-  pub shipment_tracking_number: String,
+  pub shipment_tracking_number: Option<String>,
   pub shipment_items: Vec<ShipOrderShipmentItem>,
   #[serde(serialize_with = "serialize_datetime")]
   pub response_shipment_date: DateTime<Utc>,
@@ -345,7 +345,7 @@ fn test_ship_order() {
         shipments: vec![
           ShipOrderShipment {
             carrier: "UPS".to_owned(),
-            shipment_tracking_number: "1Z12342452342".to_owned(),
+            shipment_tracking_number: Some("1Z12342452342".to_owned()),
             shipment_items: vec![
               ShipOrderShipmentItem {
                 merchant_sku: "test_product".to_owned(),
@@ -359,4 +359,27 @@ fn test_ship_order() {
       },
     )
     .unwrap()
+}
+
+#[test]
+fn test_unserialize_orders() {
+  use serde_json::{self, Value};
+  use std::fs::File;
+  use std::io::ErrorKind;
+  let f = match File::open("test_data/orders.json") {
+    Ok(f) => f,
+    Err(e) => match e.kind() {
+      ErrorKind::NotFound => return,
+      e => panic!("read order data error: {:?}", e),
+    },
+  };
+
+  let values: Vec<Value> = serde_json::from_reader(f).unwrap();
+  for value in values {
+    let pretty = serde_json::to_string_pretty(&value).unwrap();
+    match serde_json::from_str::<Order>(&pretty) {
+      Ok(_) => {}
+      Err(err) => panic!("{}\n{}", err, pretty),
+    }
+  }
 }
