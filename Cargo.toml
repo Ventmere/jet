@@ -1,6 +1,6 @@
 [package]
 name = "jet"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Flux Xu <fluxxu@gmail.com>"]
 description = "Jet API Client for Rust"
 license = "MIT"
