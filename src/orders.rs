@@ -103,6 +103,7 @@ pub struct OrderItem {
   pub fee_adjustments: Option<Vec<FeeAdjustment>>,
   // pub tax_info: Tax,
   pub regulatory_fees: Option<f32>,
+  pub item_price: Price,
 
   /// When an order moves from "ready" to "acknowledged"
   pub order_item_acknowledgement_status: Option<String>,
@@ -381,5 +382,40 @@ fn test_unserialize_orders() {
       Ok(_) => {}
       Err(err) => panic!("{}\n{}", err, pretty),
     }
+  }
+}
+
+#[test]
+fn test_download_all_orders() {
+  use client::get_test_client;
+  use serde_json;
+  let client = get_test_client();
+
+  let mut orders = vec![];
+
+  for status in vec![
+    OrderStatus::Created,
+    OrderStatus::Ready,
+    OrderStatus::Acknowledged,
+    OrderStatus::Inprogress,
+    OrderStatus::Complete,
+  ] {
+    println!("loading orders: {:?}", status);
+    let res = client.get_orders(status).unwrap();
+    let len = res.order_urls.len();
+    println!("- found {}", len);
+
+    for (i, url) in res.order_urls.into_iter().enumerate() {
+      println!("- downloading {} of {}...", i + 1, len);
+      let order = client.get_order_detail(&url).unwrap();
+      orders.push(order);
+    }
+  }
+
+  {
+    use std::fs::File;
+    println!("writing to file...");
+    let f = File::create("target/orders.json").unwrap();
+    serde_json::to_writer_pretty(f, &orders).unwrap();
   }
 }
