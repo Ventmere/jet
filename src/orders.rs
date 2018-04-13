@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use error::*;
 use utils::serialize_datetime;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum OrderStatus {
   /// 'created' - The order has just been placed. Jet.com allows a half hour for fraud check and customer cancellation. We ask that retailers NOT fulfill orders that are created.
   #[serde(rename = "created")]
@@ -82,7 +82,7 @@ pub struct FeeAdjustment {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OrderTotals {
-  pub item_price: Price,
+  pub item_price: Option<Price>,
   pub item_fees: Option<f32>,
   pub fee_adjustments: Option<Vec<FeeAdjustment>>,
   pub regulatory_fees: Option<f32>,
@@ -321,13 +321,11 @@ fn test_acknowledge_order() {
         &AcknowledgeOrder {
           acknowledgement_status: "accepted",
           alt_order_id: None,
-          order_items: vec![
-            AcknowledgeOrderItem {
-              order_item_acknowledgement_status: "fulfillable",
-              order_item_id: "2906d22b212d4745ab9986b80b1ad2af".to_owned(),
-              alt_order_item_id: None,
-            },
-          ],
+          order_items: vec![AcknowledgeOrderItem {
+            order_item_acknowledgement_status: "fulfillable",
+            order_item_id: "2906d22b212d4745ab9986b80b1ad2af".to_owned(),
+            alt_order_item_id: None,
+          }],
         }
       )
       .unwrap()
@@ -343,20 +341,16 @@ fn test_ship_order() {
       "2ab4c8b414124f0fa04072d615ec0610",
       &ShipOrder {
         alt_order_id: None,
-        shipments: vec![
-          ShipOrderShipment {
-            carrier: "UPS".to_owned(),
-            shipment_tracking_number: Some("1Z12342452342".to_owned()),
-            shipment_items: vec![
-              ShipOrderShipmentItem {
-                merchant_sku: "test_product".to_owned(),
-                response_shipment_sku_quantity: 1,
-                days_to_return: 30,
-              },
-            ],
-            response_shipment_date: Utc::now(),
-          },
-        ],
+        shipments: vec![ShipOrderShipment {
+          carrier: "UPS".to_owned(),
+          shipment_tracking_number: Some("1Z12342452342".to_owned()),
+          shipment_items: vec![ShipOrderShipmentItem {
+            merchant_sku: "test_product".to_owned(),
+            response_shipment_sku_quantity: 1,
+            days_to_return: 30,
+          }],
+          response_shipment_date: Utc::now(),
+        }],
       },
     )
     .unwrap()
