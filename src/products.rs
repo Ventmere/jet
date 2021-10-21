@@ -3,7 +3,7 @@
 //!
 
 use super::client::{Client, Method};
-use error::*;
+use crate::error::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InventoryFulfillmentNode {
@@ -24,39 +24,37 @@ pub struct Price {
 impl Client {
   pub fn update_inventory(&self, sku_id: &str, data: Inventory) -> Result<()> {
     self.request(
-      Method::Put,
+      Method::PUT,
       &format!("/merchant-skus/{}/inventory", sku_id),
       |req| {
-        req.json(&data);
-        Ok(())
+        req.json(&data)
       },
     )
   }
 
   pub fn get_inventory(&self, sku_id: &str) -> Result<Inventory> {
     self.request(
-      Method::Get,
+      Method::GET,
       &format!("/merchant-skus/{}/inventory", sku_id),
-      |_| Ok(()),
+      std::convert::identity,
     )
   }
 
   pub fn update_price(&self, sku_id: &str, data: Price) -> Result<()> {
     self.request(
-      Method::Put,
+      Method::PUT,
       &format!("/merchant-skus/{}/price", sku_id),
       |req| {
-        req.json(&data);
-        Ok(())
+        req.json(&data)
       },
     )
   }
 
   pub fn get_price(&self, sku_id: &str) -> Result<Price> {
     self.request(
-      Method::Get,
+      Method::GET,
       &format!("/merchant-skus/{}/inventory", sku_id),
-      |_| Ok(()),
+      std::convert::identity,
     )
   }
 }

@@ -1,22 +1,27 @@
+use thiserror::Error;
 use reqwest::StatusCode;
 
-error_chain! {
-  errors {
-    GetTokenRequest(status: StatusCode, body: String) {
-      description("get token request error")
-      display("get token request error: status = '{}', body = '{}'", status, body)
-    }
-
-    Request(path: String, status: StatusCode, body: String) {
-      description("request error")
-      display("request error: path = '{}', status = '{}', body = '{}'", path, status, body)
-    }
-
-    InvalidResponse
-  }
-
-  foreign_links {
-    Http(::reqwest::Error);
-    Io(::std::io::Error);
-  }
+#[derive(Debug, Error)]
+pub enum Error {
+  #[error("get token request error: status = '{status}', body = '{body}'")]
+  GetTokenRequest {
+    status: StatusCode, 
+    body: String
+  },
+  #[error("request error: path = '{path}', status = '{status}', body = '{body}'")]
+  Request {
+    path: String, 
+    status: StatusCode, 
+    body: String
+  },
+  #[error("invalid bearer token")]
+  InvalidBearerToken,
+  #[error("json: {0}")]
+  Json(#[from] serde_json::Error),
+  #[error("http: {0}")]
+  Http(#[from] reqwest::Error),
+  #[error("io: {0}")]
+  Io(#[from] std::io::Error),
 }
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;

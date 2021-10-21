@@ -4,8 +4,8 @@
 
 use super::client::{Client, Method};
 use chrono::{DateTime, Utc};
-use error::*;
-use utils::serialize_datetime;
+use crate::error::*;
+use crate::utils::serialize_datetime;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum OrderStatus {
@@ -248,7 +248,7 @@ pub struct ShipOrder {
 impl Client {
   pub fn get_orders(&self, status: OrderStatus) -> Result<GetOrdersResponse> {
     self.request(
-      Method::Get,
+      Method::GET,
       &format!(
         "/orders/{}",
         match status {
@@ -259,32 +259,30 @@ impl Client {
           OrderStatus::Complete => "complete",
         }
       ),
-      |_| Ok(()),
+      std::convert::identity,
     )
   }
 
   pub fn get_order_detail(&self, order_url: &str) -> Result<Order> {
-    self.request(Method::Get, order_url, |_| Ok(()))
+    self.request(Method::GET, order_url, std::convert::identity)
   }
 
   pub fn acknowledge_order(&self, order_id: &str, ack: &AcknowledgeOrder) -> Result<()> {
     self.request_no_content(
-      Method::Put,
+      Method::PUT,
       &format!("/orders/{}/acknowledge", order_id),
       |req| {
-        req.json(ack);
-        Ok(())
+        req.json(ack)
       },
     )
   }
 
   pub fn ship_order(&self, order_id: &str, ship: &ShipOrder) -> Result<()> {
     self.request_no_content(
-      Method::Put,
+      Method::PUT,
       &format!("/orders/{}/shipped", order_id),
       |req| {
-        req.json(ship);
-        Ok(())
+        req.json(ship)
       },
     )
   }
@@ -292,14 +290,14 @@ impl Client {
 
 #[test]
 fn test_get_orders() {
-  use client::get_test_client;
+  use crate::client::get_test_client;
   let client = get_test_client();
   println!("{:#?}", client.get_orders(OrderStatus::Ready).unwrap());
 }
 
 #[test]
 fn test_get_order_detail() {
-  use client::get_test_client;
+  use crate::client::get_test_client;
   let client = get_test_client();
   println!(
     "{:#?}",
@@ -311,7 +309,7 @@ fn test_get_order_detail() {
 
 #[test]
 fn test_acknowledge_order() {
-  use client::get_test_client;
+  use crate::client::get_test_client;
   let client = get_test_client();
   println!(
     "{:#?}",
@@ -334,7 +332,7 @@ fn test_acknowledge_order() {
 
 #[test]
 fn test_ship_order() {
-  use client::get_test_client;
+  use crate::client::get_test_client;
   let client = get_test_client();
   client
     .ship_order(
@@ -381,7 +379,7 @@ fn test_unserialize_orders() {
 
 #[test]
 fn test_download_all_orders() {
-  use client::get_test_client;
+  use crate::client::get_test_client;
   use serde_json;
   let client = get_test_client();
 

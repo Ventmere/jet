@@ -1,11 +1,11 @@
 use chrono::{DateTime, Duration, Utc};
-use error::*;
+use crate::error::*;
 use reqwest;
-pub use reqwest::{Method, RequestBuilder, Response, StatusCode};
+pub use reqwest::{Method, blocking::RequestBuilder, blocking::Response, StatusCode};
 use serde::de::DeserializeOwned;
 use std::cell::RefCell;
-use std::io::Read;
 use std::sync::Mutex;
+use std::io::Read;
 
 const ENDPOINT: &'static str = "https://merchant-api.jet.com/api";
 
@@ -25,7 +25,7 @@ pub struct ClientOptions {
 pub struct Client {
   options: ClientOptions,
   token: Mutex<RefCell<Option<Token>>>,
-  client: reqwest::Client,
+  client: reqwest::blocking::Client,
 }
 
 impl Client {
@@ -33,11 +33,11 @@ impl Client {
     Ok(Client {
       options: opts,
       token: Mutex::new(RefCell::new(None)),
-      client: reqwest::Client::new(),
+      client: reqwest::blocking::Client::new(),
     })
   }
 
-  pub fn with_http_client(opts: ClientOptions, http_client: reqwest::Client) -> Client {
+  pub fn with_http_client(opts: ClientOptions, http_client: reqwest::blocking::Client) -> Client {
     Client {
       options: opts,
       token: Mutex::new(RefCell::new(None)),
@@ -54,8 +54,7 @@ impl Client {
     match *token {
       Some(ref token) if token.expires_on - Duration::minutes(15) >= Utc::now() => f(&token),
       _ => {
-        use std::mem::replace;
-        replace(token, Some(self.get_token()?));
+        token.replace(self.get_token()?);
         f(&token.as_ref().unwrap())
       }
     }
@@ -80,66 +79,72 @@ impl Client {
     if !res.status().is_success() {
       let mut body = String::new();
       res.read_to_string(&mut body)?;
-      return Err(ErrorKind::GetTokenRequest(res.status(), body).into());
+      return Err(Error::GetTokenRequest { status: res.status(), body });
     }
 
-    res.json().chain_err(|| ErrorKind::InvalidResponse)
+    res.json().map_err(Into::into)
   }
 
   pub(crate) fn request<T, F>(&self, method: Method, path: &str, f: F) -> Result<T>
   where
     T: DeserializeOwned,
-    F: FnOnce(&mut RequestBuilder) -> Result<()>,
+    F: FnOnce(RequestBuilder) -> RequestBuilder,
   {
-    use reqwest::header::{Authorization, Bearer};
+    use headers::{HeaderMapExt, Authorization};
+    use reqwest::header::HeaderMap;
 
     let mut req = self.with_token(|token| -> Result<RequestBuilder> {
       let mut req = self
         .client
         .request(method, &format!("{}{}", ENDPOINT, path));
-      req.header(Authorization(Bearer {
-        token: token.id_token.clone(),
-      }));
+      req = req.headers({
+        let mut map = HeaderMap::new();
+        map.typed_insert(Authorization::bearer(&token.id_token).map_err(|_| Error::InvalidBearerToken)?);
+        map
+      });
       Ok(req)
     })?;
 
-    f(&mut req)?;
+    req = f(req);
 
     let mut res = req.send()?;
 
     if !res.status().is_success() {
       let mut body = String::new();
       res.read_to_string(&mut body)?;
-      return Err(ErrorKind::Request(path.to_owned(), res.status(), body).into());
+      return Err(Error::Request { path: path.to_owned(), status: res.status(), body });
     }
 
-    res.json().chain_err(|| ErrorKind::InvalidResponse)
+    res.json().map_err(Into::into)
   }
 
   pub(crate) fn request_no_content<F>(&self, method: Method, path: &str, f: F) -> Result<()>
   where
-    F: FnOnce(&mut RequestBuilder) -> Result<()>,
+    F: FnOnce(RequestBuilder) -> RequestBuilder,
   {
-    use reqwest::header::{Authorization, Bearer};
+    use headers::{HeaderMapExt, Authorization};
+    use reqwest::header::HeaderMap;
 
     let mut req = self.with_token(|token| -> Result<RequestBuilder> {
       let mut req = self
         .client
         .request(method, &format!("{}{}", ENDPOINT, path));
-      req.header(Authorization(Bearer {
-        token: token.id_token.clone(),
-      }));
+      req = req.headers({
+        let mut map = HeaderMap::new();
+        map.typed_insert(Authorization::bearer(&token.id_token).map_err(|_| Error::InvalidBearerToken)?);
+        map
+      });
       Ok(req)
     })?;
 
-    f(&mut req)?;
+    req = f(req);
 
     let mut res = req.send()?;
 
     if !res.status().is_success() {
       let mut body = String::new();
       res.read_to_string(&mut body)?;
-      return Err(ErrorKind::Request(path.to_owned(), res.status(), body).into());
+      return Err(Error::Request{ path: path.to_owned(), status: res.status(), body });
     }
 
     Ok(())
